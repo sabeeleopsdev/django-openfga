@@ -20,6 +20,8 @@ Two patterns, resolved through the same relations:
 
 These two paths are just OR'd together per relation, so a user gets a tier if *either* path resolves true — e.g. someone whose role only grants `can_view` module-wide can still fully edit a document they personally own.
 
+The model lives as OpenFGA DSL in [`authz/model.fga`](authz/model.fga) — this file is the single source of truth for the schema:
+
 ```
 model
   schema 1.1
@@ -56,11 +58,24 @@ type project
     define can_view: [user] or can_edit or can_view from parent
 ```
 
-The model is built programmatically in [`authz/model.py`](authz/model.py) using the OpenFGA Python SDK's classes (not stored as `.fga` DSL text) and pushed to the server via `python manage.py setup_openfga`.
+### Changing the model
+
+Whenever you edit a relation, add a new one, or add a new type in `authz/model.fga`:
+
+```bash
+docker compose exec web python manage.py setup_openfga
+docker compose restart web
+```
+
+`setup_openfga` is idempotent and safe to re-run any time: it reads `authz/model.fga` through the [`fga` CLI](https://github.com/openfga/cli) (`fga model transform`, which turns the DSL into the JSON the OpenFGA API expects), writes it as a new model version on the existing store, backfills `parent` tuples for any objects created before the change, and resyncs every Role's OpenFGA tuples to the current relation names (so a relation rename doesn't leave stale tuples behind). The `fga` CLI is preinstalled in the `web` image (see the `Dockerfile`), so no local install is needed to run it inside the container.
+
+If you add a brand-new permission tier (not just edit existing relations), also update `PERMISSION_TIERS` in [`authz/model.py`](authz/model.py) — it drives the Django-side `Role`/`Permission` choices and isn't derived from the DSL automatically. Adding a whole new resource module (a new `module:<name>` instance, not a new type) similarly means adding it to `MODULES` in the same file, plus wiring the module's Django app the way `documents/`/`projects/` do (see below).
+
+`authz/model.py` no longer hand-builds the model with the SDK's `Userset`/`TypeDefinition` classes — it just shells out to `fga model transform` on `model.fga` and hands the resulting JSON to `WriteAuthorizationModelRequest`.
 
 ## Project layout
 
-- **`authz/`** — the shared authorization layer: the OpenFGA client wrapper (`client.py`), the model builder (`model.py`), the `Role`/`Permission` Django models + admin + REST API, and Django signals that sync Role/Permission changes into OpenFGA tuples automatically. Also provides `OwnedObjectViewSet` / `ObjectPermission` base classes so a new resource module only needs a handful of small files.
+- **`authz/`** — the shared authorization layer: the OpenFGA schema (`model.fga`), the model loader (`model.py`), the OpenFGA client wrapper (`client.py`), the `Role`/`Permission` Django models + admin + REST API, and Django signals that sync Role/Permission changes into OpenFGA tuples automatically. Also provides `OwnedObjectViewSet` / `ObjectPermission` base classes so a new resource module only needs a handful of small files.
 - **`documents/`** — first resource module (title/content, owned by a user). Also demonstrates **field-level enforcement**: the `content` field is redacted in the API response unless the requester has `can_edit` on that document.
 - **`projects/`** — second resource module, added to prove the pattern generalizes rather than being document-specific.
 - **`config/`** — Django project settings/urls.

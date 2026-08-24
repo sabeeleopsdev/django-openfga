@@ -18,16 +18,18 @@ type document
   relations
     define parent: [module]
     define owner: [user]
+    define collaborator: [user]
     define can_admin: [user] or owner or can_admin from parent
     define can_delete: [user] or can_admin or can_delete from parent
-    define can_edit: [user] or can_delete or can_edit from parent
+    define can_edit: [user] or can_delete or can_edit from parent or collaborator
     define can_view: [user] or can_edit or can_view from parent
 
 type project
   relations
     define parent: [module]
     define owner: [user]
+    define collaborator: [user]
     define can_admin: [user] or owner or can_admin from parent
     define can_delete: [user] or can_admin or can_delete from parent
-    define can_edit: [user] or can_delete or can_edit from parent
+    define can_edit: [user] or can_delete or can_edit from parent or collaborator
     define can_view: [user] or can_edit or can_view from parent

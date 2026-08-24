@@ -64,14 +64,22 @@ Whenever you edit a relation, add a new one, or add a new type in `authz/model.f
 
 ```bash
 docker compose exec web python manage.py setup_openfga
-docker compose restart web
+docker compose up -d web
 ```
 
 `setup_openfga` is idempotent and safe to re-run any time: it reads `authz/model.fga` through the [`fga` CLI](https://github.com/openfga/cli) (`fga model transform`, which turns the DSL into the JSON the OpenFGA API expects), writes it as a new model version on the existing store, backfills `parent` tuples for any objects created before the change, and resyncs every Role's OpenFGA tuples to the current relation names (so a relation rename doesn't leave stale tuples behind). The `fga` CLI is preinstalled in the `web` image (see the `Dockerfile`), so no local install is needed to run it inside the container.
 
+Use `docker compose up -d web`, not `docker compose restart web`, afterwards — `restart` reuses the container's existing environment, so it won't pick up the new `OPENFGA_AUTHORIZATION_MODEL_ID` that `setup_openfga` just wrote to `.env`. Only `up -d` re-reads `env_file` and recreates the container with it.
+
 If you add a brand-new permission tier (not just edit existing relations), also update `PERMISSION_TIERS` in [`authz/model.py`](authz/model.py) — it drives the Django-side `Role`/`Permission` choices and isn't derived from the DSL automatically. Adding a whole new resource module (a new `module:<name>` instance, not a new type) similarly means adding it to `MODULES` in the same file, plus wiring the module's Django app the way `documents/`/`projects/` do (see below).
 
 `authz/model.py` no longer hand-builds the model with the SDK's `Userset`/`TypeDefinition` classes — it just shells out to `fga model transform` on `model.fga` and hands the resulting JSON to `WriteAuthorizationModelRequest`.
+
+### Inspecting the model
+
+- `docker compose exec web python manage.py show_model_graph` — prints an ASCII tree per type showing which relations imply which (following `or <relation>` and `<relation> from parent` edges), rooted at the relations nothing else feeds (e.g. `owner`, `collaborator`). It's derived straight from `model.fga` each run, so it stays accurate as the model changes.
+- `docker compose exec web fga model get --store-id "$OPENFGA_STORE_ID" --api-url "$OPENFGA_API_URL" --format fga` — fetches the model actually live on the OpenFGA server (DSL form), useful to confirm it matches `model.fga` after a push.
+- The OpenFGA Playground (enabled via `OPENFGA_PLAYGROUND_ENABLED=true` in `docker-compose.yml`) at `http://localhost:3000/playground` gives a visual, interactive graph plus a "check" tool, if you want more than the terminal.
 
 ## Project layout
 

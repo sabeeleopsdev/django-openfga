@@ -29,4 +29,5 @@ urlpatterns = [
     path('api/', include('documents.urls')),
     path('api/', include('projects.urls')),
     path('api/', include('authz.urls')),
+    path('', include('eventing.urls')),
 ]

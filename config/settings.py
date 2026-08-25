@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'authz',
     'documents',
     'projects',
+    'eventing',
 ]
 
 REST_FRAMEWORK = {
@@ -72,6 +73,21 @@ SPECTACULAR_SETTINGS = {
 OPENFGA_API_URL = os.environ.get('OPENFGA_API_URL', 'http://openfga:8080')
 OPENFGA_STORE_ID = os.environ.get('OPENFGA_STORE_ID', '')
 OPENFGA_AUTHORIZATION_MODEL_ID = os.environ.get('OPENFGA_AUTHORIZATION_MODEL_ID', '')
+
+# Eventing (pg_notify -> Inngest). Deliberately independent of OpenFGA/authz -
+# it only reacts to plain model changes on documents/projects for now.
+PG_NOTIFY_CHANNEL = os.environ.get('PG_NOTIFY_CHANNEL', 'eventing_channel')
+INNGEST_APP_ID = os.environ.get('INNGEST_APP_ID', 'django-openfga-demo')
+EVENTING_NOTIFY_EMAIL = os.environ.get('EVENTING_NOTIFY_EMAIL', '')
+
+# Email (used by the eventing Inngest function to notify on db changes)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

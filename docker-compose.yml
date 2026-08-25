@@ -16,6 +16,32 @@ services:
     volumes:
       - .:/app
 
+  event-listener:
+    image: python-django
+    container_name: django-openfga-event-listener
+    build:
+       context: .
+       dockerfile: Dockerfile
+    command: python manage.py listen_pg_events
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+
+  inngest:
+    image: inngest/inngest:latest
+    container_name: django-openfga-inngest
+    command: inngest dev --host 0.0.0.0 -u http://web:8000/api/inngest
+    ports:
+      - "8288:8288"
+    depends_on:
+      - web
+
   db:
     image: postgres:16
     container_name: django-openfga-db
